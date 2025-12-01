@@ -32,6 +32,50 @@ def extract_name_candidates(raw_text: str, max_candidates: int = MAX_CANDIDATES)
             break
     return candidates
 
+@st.cache_data(show_spinner=False)
+def load_set_catalog() -> Dict[str, Dict[str, str]]:
+    try:
+        response = requests.get(SCRYFALL_SETS_ENDPOINT, timeout=20)
+        response.raise_for_status()
+    except requests.RequestException:
+        return {}
+
+    data = response.json().get("data", [])
+    catalog: Dict[str, Dict[str, str]] = {}
+    for entry in data:
+        code = entry.get("code")
+        if not code:
+            continue
+        catalog[code.upper()] = {
+            "name": entry.get("name", code.upper()),
+            "released_at": entry.get("released_at"),
+        }
+    return catalog
+
+SET_CODE_PATTERN = re.compile(r"\b([A-Z0-9]{2,5})\b")
+
+def extract_set_codes(raw_text: str, valid_codes: Dict[str, Dict[str, str]], max_codes: int = 3) -> List[str]:
+    if not raw_text or not valid_codes:
+        return []
+
+    lines = [line.upper() for line in raw_text.splitlines() if line.strip()]
+    prioritized = [line for line in lines if "/" in line or any(ch.isdigit() for ch in line)]
+    scan_lines = prioritized or lines
+
+    detected: List[str] = []
+    for line in scan_lines:
+        for token in SET_CODE_PATTERN.findall(line):
+            if token.isdigit():
+                continue
+            if token not in valid_codes:
+                continue
+            if token in detected:
+                continue
+            detected.append(token)
+            if len(detected) >= max_codes:
+                return detected
+    return detected
+
 def downscale_image_to_limit(image: Image.Image, max_bytes: int = MAX_UPLOAD_BYTES) -> Tuple[Optional[bytes], Optional[int], Optional[str]]:
     working = image
     if working.mode not in ("RGB", "L"):
@@ -88,18 +132,32 @@ def call_ocr_space(image_bytes: bytes, api_key: str) -> Tuple[str, Optional[str]
     return combined_text.strip(), None
 
 @st.cache_data(show_spinner=False)
-def fetch_card_by_name(card_name: str) -> Tuple[Optional[Dict], Optional[str]]:
-    params = {"fuzzy": card_name}
-    try:
-        response = requests.get(SCRYFALL_NAMED_ENDPOINT, params=params, timeout=15)
-    except requests.RequestException as exc:
-        return None, f"Scryfall request failed: {exc}"
+def fetch_card_by_name(card_name: str, set_code: Optional[str] = None) -> Tuple[Optional[Dict], Optional[str]]:
+    attempts = []
+    if set_code:
+        attempts.append({"fuzzy": card_name, "set": set_code.lower()})
+    attempts.append({"fuzzy": card_name})
 
-    if response.status_code != 200:
-        detail = response.json().get("details") if response.headers.get("content-type", "").startswith("application/json") else response.text
-        return None, f"Scryfall error ({response.status_code}): {detail}"
+    last_error: Optional[str] = None
+    for params in attempts:
+        try:
+            response = requests.get(SCRYFALL_NAMED_ENDPOINT, params=params, timeout=15)
+        except requests.RequestException as exc:
+            last_error = f"Scryfall request failed: {exc}"
+            continue
 
-    return response.json(), None
+        if response.status_code != 200:
+            detail = (
+                response.json().get("details")
+                if response.headers.get("content-type", "").startswith("application/json")
+                else response.text
+            )
+            last_error = f"Scryfall error ({response.status_code}): {detail}"
+            continue
+
+        return response.json(), None
+
+    return None, last_error or "Unknown Scryfall error"
 
 def card_image_url(card: Dict) -> Optional[str]:
     if "image_uris" in card:
@@ -176,6 +234,9 @@ def main() -> None:
     uploaded = st.file_uploader("Upload a card photo", type=["png", "jpg", "jpeg", "webp"])
     ocr_text = ""
     candidates: List[str] = []
+    set_candidates: List[str] = []
+    detected_set_code: Optional[str] = None
+    set_catalog: Dict[str, Dict[str, str]] = {}
 
     if uploaded:
         image = Image.open(uploaded)
@@ -207,6 +268,17 @@ def main() -> None:
                 st.success(f"Suggested card names: {', '.join(candidates)}")
             else:
                 st.info("Could not confidently extract a card title. Try typing it manually.")
+
+            set_catalog = load_set_catalog()
+            set_candidates = extract_set_codes(ocr_text, set_catalog)
+            if set_candidates:
+                detected_set_code = set_candidates[0]
+                readable_sets = ", ".join(
+                    f"{code} – {set_catalog.get(code, {}).get('name', 'Unknown')}" for code in set_candidates
+                )
+                st.success(f"Detected set codes: {readable_sets}")
+            else:
+                st.info("Set symbol not detected. You can type a set code manually if needed.")
     else:
         st.info("Upload a card image to start scanning.")
 
@@ -219,15 +291,21 @@ def main() -> None:
             value=selected_candidate if candidates else "",
             help="Use this when OCR suggestions are incomplete or incorrect.",
         )
+        set_override = st.text_input(
+            "Set code override",
+            value=detected_set_code or "",
+            help="Auto-detected from the collector line (e.g., DMU, LTR). Leave blank for the default Scryfall printing.",
+        )
         submitted = st.form_submit_button("Fetch card details")
 
     search_name = (manual_name or selected_candidate).strip()
+    chosen_set_code = (set_override or detected_set_code or "").strip().lower()
     if submitted:
         if not search_name or search_name == "No automatic suggestions":
             st.warning("Please enter a card name before fetching.")
         else:
             with st.spinner(f"Fetching {search_name} from Scryfall..."):
-                card, error = fetch_card_by_name(search_name)
+                card, error = fetch_card_by_name(search_name, chosen_set_code or None)
             if error:
                 st.error(error)
             elif card:

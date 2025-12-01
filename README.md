@@ -24,3 +24,9 @@ The OCR key stays in your browser session only. All Scryfall lookups are anonymo
 
 - The app automatically recompresses uploads to stay under 1 MB before sending them to OCR.Space.
 - If a photo is too large to shrink safely, crop it tighter around the card and try again.
+
+### Automatic set detection
+
+- The OCR pass also scans for the collector-line set code (e.g., `DMU`, `LTR`).
+- When a code is found, the app queries the matching printing on Scryfall automatically.
+- You can override the detected code in the form if the scan misreads the collector line.
