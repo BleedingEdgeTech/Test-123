@@ -326,7 +326,7 @@ def main() -> None:
         if not query_name:
             st.warning("Bitte einen Kartennamen eingeben.")
         else:
-            with st.spinner(f"Suche „{query_name}" auf Scryfall …"):
+            with st.spinner(f"Suche {query_name} auf Scryfall …"):
                 card, err = fetch_card(query_name, query_set)
             if err:
                 st.error(err)
