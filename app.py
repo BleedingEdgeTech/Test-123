@@ -8,6 +8,7 @@ from PIL import Image
 
 OCR_ENDPOINT = "https://api.ocr.space/parse/image"
 SCRYFALL_NAMED_ENDPOINT = "https://api.scryfall.com/cards/named"
+SCRYFALL_SETS_ENDPOINT = "https://api.scryfall.com/sets"
 MAX_CANDIDATES = 5
 MAX_UPLOAD_BYTES = 1024 * 1024  # 1 MB cap expected by OCR provider
 
