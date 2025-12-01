@@ -1,8 +1,8 @@
 # MTG Card Scanner
 
-Streamlit app that converts a Magic: The Gathering card photo into structured data by combining OCR.Space for text extraction and the Scryfall API for authoritative card details.
+Streamlit-App, die ein Foto einer Magic: The Gathering-Karte analysiert, Name und Set per OCR erkennt und die offiziellen Kartendetails von Scryfall abruft.
 
-## Quick start
+## Schnellstart
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -10,23 +10,21 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open the printed local URL in your browser.
+Die App öffnet sich im Browser unter der angezeigten URL.
 
-## Usage
+## Benutzung
 
-1. Obtain a free OCR key from https://ocr.space/ocrapi and paste it in the Streamlit sidebar.
-2. Upload a clear, cropped photo of the card front.
-3. Review the detected title suggestions, optionally correct it, then fetch the Scryfall details.
+1. Kostenlosen OCR-Key von https://ocr.space/ocrapi holen und in der Sidebar eingeben.
+2. Ein gut belichtetes, scharfes Foto der Karte hochladen.
+3. Namen und Set prüfen/korrigieren, dann auf „Karte abrufen" klicken.
 
-The OCR key stays in your browser session only. All Scryfall lookups are anonymous and rate-limited according to their public API policy.
+Der API-Key bleibt nur in der Browser-Session gespeichert. Scryfall-Anfragen erfolgen anonym und unterliegen deren Rate-Limit.
 
-### Image requirements
+## Features
 
-- The app automatically recompresses uploads to stay under 1 MB before sending them to OCR.Space.
-- If a photo is too large to shrink safely, crop it tighter around the card and try again.
-
-### Automatic set detection
-
-- The OCR pass also scans for the collector-line set code (e.g., `DMU`, `LTR`).
-- When a code is found, the app queries the matching printing on Scryfall automatically.
-- You can override the detected code in the form if the scan misreads the collector line.
+| Feature | Beschreibung |
+|---------|--------------|
+| **Bildkomprimierung** | Uploads werden automatisch auf ≤ 1 MB JPEG komprimiert. |
+| **OCR** | OCR.Space extrahiert den Text; daraus werden Kartennamen-Kandidaten abgeleitet. |
+| **Set-Erkennung** | Die App erkennt Set-Codes (z. B. `DMU`, `LTR`) und fragt das passende Printing ab. |
+| **Fallback** | Schlägt die Set-spezifische Suche fehl, wird automatisch ein beliebiges Printing geladen. |
