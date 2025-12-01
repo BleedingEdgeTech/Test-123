@@ -1,3 +1,4 @@
+from io import BytesIO
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -8,6 +9,7 @@ from PIL import Image
 OCR_ENDPOINT = "https://api.ocr.space/parse/image"
 SCRYFALL_NAMED_ENDPOINT = "https://api.scryfall.com/cards/named"
 MAX_CANDIDATES = 5
+MAX_UPLOAD_BYTES = 1024 * 1024  # 1 MB cap expected by OCR provider
 
 def _clean_line(line: str) -> str:
     # OCR noise filter keeps only letters, spaces, dashes, and apostrophes
@@ -29,10 +31,37 @@ def extract_name_candidates(raw_text: str, max_candidates: int = MAX_CANDIDATES)
             break
     return candidates
 
+def downscale_image_to_limit(image: Image.Image, max_bytes: int = MAX_UPLOAD_BYTES) -> Tuple[Optional[bytes], Optional[int], Optional[str]]:
+    working = image
+    if working.mode not in ("RGB", "L"):
+        working = working.convert("RGB")
+    elif working.mode == "L":
+        working = working.convert("RGB")
+
+    width, height = working.size
+    quality = 90
+    while True:
+        buffer = BytesIO()
+        working.save(buffer, format="JPEG", quality=quality, optimize=True)
+        size = buffer.tell()
+        if size <= max_bytes:
+            buffer.seek(0)
+            return buffer.getvalue(), size, None
+        if quality > 55:
+            quality -= 5
+            continue
+        new_width = int(width * 0.85)
+        new_height = int(height * 0.85)
+        if min(new_width, new_height) < 300:
+            return None, None, "Unable to shrink image under 1024 KB. Please upload a tighter crop."
+        width, height = new_width, new_height
+        working = working.resize((width, height), Image.LANCZOS)
+        quality = 85
+
 def call_ocr_space(image_bytes: bytes, api_key: str) -> Tuple[str, Optional[str]]:
     if not api_key:
         return "", "OCR.Space API key is required to run the scanner."
-    files = {"file": ("upload.png", image_bytes)}
+    files = {"file": ("upload.jpg", image_bytes)}
     data = {
         "language": "eng",
         "isOverlayRequired": False,
@@ -150,10 +179,22 @@ def main() -> None:
     if uploaded:
         image = Image.open(uploaded)
         st.image(image, caption="Uploaded image", width=450)
-        image_bytes = uploaded.getvalue()
 
-        with st.spinner("Running OCR..."):
-            ocr_text, ocr_error = call_ocr_space(image_bytes, api_key)
+        with st.spinner("Optimizing image …"):
+            optimized_bytes, optimized_size, sizing_error = downscale_image_to_limit(image)
+
+        if sizing_error:
+            st.error(sizing_error)
+            optimized_bytes = None
+        else:
+            size_kb = (optimized_size or 0) / 1024
+            st.caption(f"Compressed upload: {size_kb:.0f} KB (≤ 1024 KB requirement)")
+
+        if optimized_bytes:
+            with st.spinner("Running OCR..."):
+                ocr_text, ocr_error = call_ocr_space(optimized_bytes, api_key)
+        else:
+            ocr_text, ocr_error = "", "Image compression failed."
 
         if ocr_error:
             st.error(ocr_error)
