@@ -1,3 +1,9 @@
-streamlit==1.40.0
-requests==2.32.3
-Pillow==11.0.0
+# MTG Card Recognition - Dependencies
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+requests>=2.31.0
+pytesseract>=0.3.10
+scikit-image>=0.21.0
+imagehash>=4.3.1
+python-dotenv>=1.0.0

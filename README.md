@@ -1,30 +1,76 @@
-# MTG Card Scanner
+# MTG Card Recognition Software
 
-Streamlit-App, die ein Foto einer Magic: The Gathering-Karte analysiert, Name und Set per OCR erkennt und die offiziellen Kartendetails von Scryfall abruft.
-
-## Schnellstart
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Die App öffnet sich im Browser unter der angezeigten URL.
-
-## Benutzung
-
-1. Kostenlosen OCR-Key von https://ocr.space/ocrapi holen und in der Sidebar eingeben.
-2. Ein gut belichtetes, scharfes Foto der Karte hochladen.
-3. Namen und Set prüfen/korrigieren, dann auf „Karte abrufen" klicken.
-
-Der API-Key bleibt nur in der Browser-Session gespeichert. Scryfall-Anfragen erfolgen anonym und unterliegen deren Rate-Limit.
+Ein Python-basiertes Kartenerkennungssystem für Magic: The Gathering Karten.
 
 ## Features
 
-| Feature | Beschreibung |
-|---------|--------------|
-| **Bildkomprimierung** | Uploads werden automatisch auf ≤ 1 MB JPEG komprimiert. |
-| **OCR** | OCR.Space extrahiert den Text; daraus werden Kartennamen-Kandidaten abgeleitet. |
-| **Set-Erkennung** | Die App erkennt Set-Codes (z. B. `DMU`, `LTR`) und fragt das passende Printing ab. |
-| **Fallback** | Schlägt die Set-spezifische Suche fehl, wird automatisch ein beliebiges Printing geladen. |
+- **Kartenerkennung**: Erkennt MTG-Karten aus Fotos/Scans
+- **Versionsidentifikation**: Identifiziert die korrekte Edition (Set) der Karte
+- **Scryfall API Integration**: Nutzt die offizielle MTG-Datenbank
+- **OCR**: Liest Kartennamen mittels Texterkennung
+- **Bild-Hashing**: Vergleicht Kartenbilder für präzise Identifikation
+
+## Installation
+
+1. **Tesseract OCR installieren**:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install tesseract-ocr
+   
+   # macOS
+   brew install tesseract
+   
+   # Windows: Download von https://github.com/UB-Mannheim/tesseract/wiki
+   ```
+
+2. **Python-Abhängigkeiten installieren**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Verwendung
+
+### Einzelne Karte erkennen
+```python
+from mtg_recognizer import MTGCardRecognizer
+
+recognizer = MTGCardRecognizer()
+result = recognizer.recognize_card("path/to/card_image.jpg")
+
+print(f"Karte: {result['name']}")
+print(f"Set: {result['set_name']}")
+print(f"Konfidenz: {result['confidence']}%")
+```
+
+### CLI-Nutzung
+```bash
+python main.py --image path/to/card.jpg
+python main.py --webcam  # Live-Erkennung via Webcam
+```
+
+## Projektstruktur
+
+```
+mtg-card-recognition/
+├── main.py                 # Haupteinstiegspunkt
+├── mtg_recognizer/
+│   ├── __init__.py
+│   ├── recognizer.py       # Haupterkennungslogik
+│   ├── image_processor.py  # Bildvorverarbeitung
+│   ├── ocr_engine.py       # OCR für Kartennamen
+│   ├── scryfall_api.py     # Scryfall API Client
+│   └── card_matcher.py     # Kartenabgleich & Versionserkennung
+├── requirements.txt
+└── README.md
+```
+
+## API
+
+Die Software nutzt die [Scryfall API](https://scryfall.com/docs/api) für:
+- Kartensuche nach Name
+- Abruf aller Versionen einer Karte
+- Bildvergleich zur Versionserkennung
+
+## Lizenz
+
+MIT License
